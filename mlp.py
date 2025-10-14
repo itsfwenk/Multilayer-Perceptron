@@ -37,10 +37,10 @@ class MLP:
         """Derivative of sigmoid"""
         return a * (1 - a)
 
-    def softmax(self, z):
+    def softmax(self, a):
         """Softmax activation for output layer"""
-        exp_z = np.exp(z - np.max(z, axis=1, keepdims=True))
-        return exp_z / np.sum(exp_z, axis=1, keepdims=True)
+        exp_a = np.exp(a - np.max(a, axis=1, keepdims=True))
+        return exp_a / np.sum(exp_a, axis=1, keepdims=True)
 
     def forward(self, X):
         """

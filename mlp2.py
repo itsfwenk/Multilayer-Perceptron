@@ -17,19 +17,40 @@ class MLP:
             self.weights.append(weight_matrix)
             self.biases.append(bias_vector)
 
-    # def sigmoid(self, z):
-    #     return 1 / (1 + np.exp(-z))
+    def sigmoid(self, z: np.ndarray) -> np.ndarray:
+        z = np.clip(z, -500, 500)
+        return 1 / (1 + np.exp(-z))
 
-    # def sigmoid_derivative(self, z):
-    #     return z * (1 - z)
+    def sigmoid_derivative(self, a):
+        return a * (1 - a)
 
-    # def forward(self, X):
-    #     activations = [X]
-    #     for W, b in zip(self.weights, self.biases):
-    #         Z = np.dot(activations[-1], W) + b
-    #         A = self.sigmoid(Z)
-    #         activations.append(A)
-    #     return activations
+    def softmax(self, z):
+        """Softmax activation for output layer"""
+        exp_z = np.exp(z - np.max(z, axis=1, keepdims=True))
+        return exp_z / np.sum(exp_z, axis=1, keepdims=True)
+
+    def forward(self, X):
+        """
+        Forward propagation through the network.
+
+        Args:
+            X: Input data of shape (n_samples, n_features)
+
+        Returns:
+            activations: List of activations for each layer
+        """
+        activations = [X]
+
+        for i in range(len(self.weights) - 1):
+            z = np.dot(activations[-1], self.weights[i]) + self.biases[i]
+            a = self.sigmoid(z)
+            activations.append(a)
+
+        z = np.dot(activations[-1], self.weights[-1]) + self.biases[-1]
+        a = self.softmax(z)
+        activations.append(a)
+
+        return activations
 
     # def backward(self, X, y, activations):
     #     m = y.shape[0]
@@ -56,6 +77,39 @@ class MLP:
     #         if epoch % 10 == 0:
     #             train_loss = self.binary_cross_entropy(y_train, activations[-1])
     #             print(f"Epoch {epoch}, Train Loss: {train_loss}")
+
+def one_hot_encode(y, num_classes):
+    """Convert labels to one-hot encoding"""
+    n_samples = y.shape[0]
+    y_encoded = np.zeros((n_samples, num_classes))
+    y_encoded[np.arange(n_samples), y] = 1
+    return y_encoded
+
+def normalize_data(X_train, X_valid):
+    """Normalize features using mean and std from training set"""
+    mean = np.mean(X_train, axis=0)
+    std = np.std(X_train, axis=0)
+    std[std == 0] = 1
+
+    X_train = (X_train - mean) / std
+    X_valid = (X_valid - mean) / std
+
+    return X_train, X_valid
+
+def split_dataset(X, y, validation_split=0.2, seed=42):
+    """Split dataset into training and validation sets"""
+    np.random.seed(seed)
+    n_samples = X.shape[0]
+    indices = np.random.permutation(n_samples)
+
+    n_valid = int(n_samples * validation_split)
+    valid_indices = indices[:n_valid]
+    train_indices = indices[n_valid:]
+
+    X_train, X_valid = X[train_indices], X[valid_indices]
+    y_train, y_valid = y[train_indices], y[valid_indices]
+
+    return X_train, X_valid, y_train, y_valid
 
 def load_dataset(filepath):
     """Load dataset from CSV file"""
@@ -87,6 +141,35 @@ def main():
 
     # Load dataset
     X, y = load_dataset(args.dataset)
+    # print(X.shape, y.shape)
+
+
+    if args.mode == 'train':
+        X_train, X_valid, y_train, y_valid = split_dataset(X, y, validation_split=0.2, seed=args.seed)
+
+        X_train, X_valid = normalize_data(X_train, X_valid)
+
+        # One-hot encode labels
+        num_classes = len(np.unique(y))
+        y_train_encoded = one_hot_encode(y_train, num_classes)
+        y_valid_encoded = one_hot_encode(y_valid, num_classes)
+
+        # Create and train model
+        mlp = MLP(
+            input_size=X_train.shape[1],
+            hidden_layers=args.hidden_layers,
+            output_size=num_classes,
+            learning_rate=args.learning_rate,
+            seed=args.seed
+        )
+
+
+        # mlp.train(X_train, y_train_encoded, X_valid, y_valid_encoded, epochs=args.epochs)
+
+        # # Save model
+        # mlp.save_model(args.model)
+
+
 
     # if args.mode == 'train':
     #     # Split dataset
