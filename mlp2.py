@@ -52,6 +52,81 @@ class MLP:
 
         return activations
 
+    def binary_cross_entropy(self, y_true, y_pred):
+        """
+        Calculate binary cross-entropy loss.
+
+        Args:
+            y_true: True labels (one-hot encoded)
+            y_pred: Predicted probabilities
+
+        Returns:
+            loss: Average loss
+        """
+        N = y_true.shape[0]
+        epsilon = 1e-15
+        y_pred = np.clip(y_pred, epsilon, 1 - epsilon)
+        loss = -np.sum(y_true * np.log(y_pred)) / N
+        return loss
+
+    def backward(self, X, y, activations):
+        """
+        Backward propagation to compute gradients.
+
+        Args:
+            X: Input data
+            y: True labels (one-hot encoded)
+            activations: List of activations from forward pass
+        """
+        m = X.shape[0]
+        gradients_w = []
+        gradients_b = []
+
+        # Output layer gradient (softmax + cross-entropy)
+        delta = activations[-1] - y
+
+    #     # Backpropagate through all layers
+    #     for i in range(len(self.weights) - 1, -1, -1):
+    #         grad_w = np.dot(activations[i].T, delta) / m
+    #         grad_b = np.sum(delta, axis=0, keepdims=True) / m
+
+    #         gradients_w.insert(0, grad_w)
+    #         gradients_b.insert(0, grad_b)
+
+    #         if i > 0:
+    #             delta = np.dot(delta, self.weights[i].T) * self.sigmoid_derivative(activations[i])
+
+    #     # Update weights and biases
+    #     for i in range(len(self.weights)):
+    #         self.weights[i] -= self.learning_rate * gradients_w[i]
+    #         self.biases[i] -= self.learning_rate * gradients_b[i]
+
+    def train(self, X_train, y_train, X_valid, y_valid, epochs=70):
+        """
+        Train the neural network.
+
+        Args:
+            X_train: Training data
+            y_train: Training labels (one-hot encoded)
+            X_valid: Validation data
+            y_valid: Validation labels (one-hot encoded)
+            epochs: Number of training epochs
+        """
+        # print(f"x_train shape : {X_train.shape}")
+        # print(f"x_valid shape : {X_valid.shape}")
+
+        for epoch in range(epochs):
+            activations = self.forward(X_train)
+
+            self.backward(X_train, y_train, activations)
+
+        #     train_loss = self.binary_cross_entropy(y_train, activations[-1])
+
+        #     valid_activations = self.forward(X_valid)
+        #     valid_loss = self.binary_cross_entropy(y_valid, valid_activations[-1])
+
+        #     print(f"epoch {epoch+1:02d}/{epochs} - loss: {train_loss:.4f} - val_loss: {valid_loss:.4f}")
+
     # def backward(self, X, y, activations):
     #     m = y.shape[0]
     #     y = y.reshape(-1, 1)  # Ensure y is a column vector
@@ -149,12 +224,10 @@ def main():
 
         X_train, X_valid = normalize_data(X_train, X_valid)
 
-        # One-hot encode labels
         num_classes = len(np.unique(y))
         y_train_encoded = one_hot_encode(y_train, num_classes)
         y_valid_encoded = one_hot_encode(y_valid, num_classes)
 
-        # Create and train model
         mlp = MLP(
             input_size=X_train.shape[1],
             hidden_layers=args.hidden_layers,
@@ -163,8 +236,7 @@ def main():
             seed=args.seed
         )
 
-
-        # mlp.train(X_train, y_train_encoded, X_valid, y_valid_encoded, epochs=args.epochs)
+        mlp.train(X_train, y_train_encoded, X_valid, y_valid_encoded, epochs=args.epochs)
 
         # # Save model
         # mlp.save_model(args.model)
