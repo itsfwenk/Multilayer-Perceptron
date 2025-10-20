@@ -12,7 +12,8 @@ class MLP:
         self.biases = []
 
         for i in range(len(self.layers) - 1):
-            weight_matrix = np.random.randn(self.layers[i], self.layers[i + 1]) * 0.01
+            # Xavier/Glorot initialization for better gradient flow
+            weight_matrix = np.random.randn(self.layers[i], self.layers[i + 1]) * np.sqrt(2.0 / (self.layers[i] + self.layers[i + 1]))
             bias_vector = np.zeros((1, self.layers[i + 1]))
             self.weights.append(weight_matrix)
             self.biases.append(bias_vector)
@@ -82,24 +83,21 @@ class MLP:
         gradients_w = []
         gradients_b = []
 
-        # Output layer gradient (softmax + cross-entropy)
         delta = activations[-1] - y
 
-    #     # Backpropagate through all layers
-    #     for i in range(len(self.weights) - 1, -1, -1):
-    #         grad_w = np.dot(activations[i].T, delta) / m
-    #         grad_b = np.sum(delta, axis=0, keepdims=True) / m
+        for i in range(len(self.weights) - 1, -1, -1):
+            grad_w = np.dot(activations[i].T, delta) / m
+            grad_b = np.sum(delta, axis=0, keepdims=True) / m
 
-    #         gradients_w.insert(0, grad_w)
-    #         gradients_b.insert(0, grad_b)
+            gradients_w.insert(0, grad_w)
+            gradients_b.insert(0, grad_b)
 
-    #         if i > 0:
-    #             delta = np.dot(delta, self.weights[i].T) * self.sigmoid_derivative(activations[i])
+            if i > 0:
+                delta = np.dot(delta, self.weights[i].T) * self.sigmoid_derivative(activations[i])
 
-    #     # Update weights and biases
-    #     for i in range(len(self.weights)):
-    #         self.weights[i] -= self.learning_rate * gradients_w[i]
-    #         self.biases[i] -= self.learning_rate * gradients_b[i]
+        for i in range(len(self.weights)):
+            self.weights[i] -= self.learning_rate * gradients_w[i]
+            self.biases[i] -= self.learning_rate * gradients_b[i]
 
     def train(self, X_train, y_train, X_valid, y_valid, epochs=70):
         """
@@ -112,46 +110,53 @@ class MLP:
             y_valid: Validation labels (one-hot encoded)
             epochs: Number of training epochs
         """
-        # print(f"x_train shape : {X_train.shape}")
-        # print(f"x_valid shape : {X_valid.shape}")
 
         for epoch in range(epochs):
             activations = self.forward(X_train)
-
             self.backward(X_train, y_train, activations)
+            train_loss = self.binary_cross_entropy(y_train, activations[-1])
+            valid_activations = self.forward(X_valid)
+            valid_loss = self.binary_cross_entropy(y_valid, valid_activations[-1])
+            print(f"epoch {epoch+1:02d}/{epochs} - loss: {train_loss:.4f} - val_loss: {valid_loss:.4f}")
 
-        #     train_loss = self.binary_cross_entropy(y_train, activations[-1])
+    def predict(self, X):
+        """
+        Make predictions on input data.
 
-        #     valid_activations = self.forward(X_valid)
-        #     valid_loss = self.binary_cross_entropy(y_valid, valid_activations[-1])
+        Args:
+            X: Input data
 
-        #     print(f"epoch {epoch+1:02d}/{epochs} - loss: {train_loss:.4f} - val_loss: {valid_loss:.4f}")
+        Returns:
+            predictions: Predicted class labels
+            probabilities: Predicted probabilities
+        """
+        activations = self.forward(X)
+        probabilities = activations[-1]
+        predictions = np.argmax(probabilities, axis=1)
+        return predictions, probabilities
 
-    # def backward(self, X, y, activations):
-    #     m = y.shape[0]
-    #     y = y.reshape(-1, 1)  # Ensure y is a column vector
-    #     deltas = [activations[-1] - y]
+    def save_model(self, filepath, normalization_params=None):
+        """Save model weights and architecture to disk"""
+        model_data = {
+            'weights': self.weights,
+            'biases': self.biases,
+            'layers': self.layers,
+            'learning_rate': self.learning_rate,
+            'normalization_params': normalization_params
+        }
+        np.save(filepath, model_data)
+        print(f"> saving model '{filepath}' to disk...")
 
-    #     for i in range(len(self.layers) - 2, 0, -1):
-    #         delta = np.dot(deltas[-1], self.weights[i].T) * self.sigmoid_derivative(activations[i])
-    #         deltas.append(delta)
+    def load_model(self, filepath):
+        """Load model weights and architecture from disk"""
+        model_data = np.load(filepath, allow_pickle=True).item()
+        self.weights = model_data['weights']
+        self.biases = model_data['biases']
+        self.layers = model_data['layers']
+        self.learning_rate = model_data['learning_rate']
+        print(f"> loading model '{filepath}' from disk...")
+        return model_data.get('normalization_params', None)
 
-    #     deltas.reverse()
-
-    #     for i in range(len(self.weights)):
-    #         dW = np.dot(activations[i].T, deltas[i]) / m
-    #         db = np.sum(deltas[i], axis=0, keepdims=True) / m
-    #         self.weights[i] -= self.learning_rate * dW
-    #         self.biases[i] -= self.learning_rate * db
-
-    # def train(self, X_train, y_train, X_valid=None, y_valid=None, epochs=100):
-    #     for epoch in range(epochs):
-    #         activations = self.forward(X_train)
-    #         self.backward(X_train, y_train, activations)
-
-    #         if epoch % 10 == 0:
-    #             train_loss = self.binary_cross_entropy(y_train, activations[-1])
-    #             print(f"Epoch {epoch}, Train Loss: {train_loss}")
 
 def one_hot_encode(y, num_classes):
     """Convert labels to one-hot encoding"""
@@ -169,7 +174,7 @@ def normalize_data(X_train, X_valid):
     X_train = (X_train - mean) / std
     X_valid = (X_valid - mean) / std
 
-    return X_train, X_valid
+    return X_train, X_valid, {'mean': mean, 'std': std}
 
 def split_dataset(X, y, validation_split=0.2, seed=42):
     """Split dataset into training and validation sets"""
@@ -201,13 +206,13 @@ def load_dataset(filepath):
 
 def main():
     parser = argparse.ArgumentParser(description='Multilayer Perceptron')
-    parser.add_argument('--dataset', type=str, required=True, help='Path to dataset CSV file')
+    parser.add_argument('--dataset', type=str, default='data.csv', help='Path to dataset CSV file')
     parser.add_argument('--mode', type=str, default='train', choices=['train', 'predict'],
                         help='Mode: train or predict')
     parser.add_argument('--model', type=str, default='./saved_model.npy',
                         help='Path to save/load model')
     parser.add_argument('--epochs', type=int, default=70, help='Number of training epochs')
-    parser.add_argument('--learning_rate', type=float, default=0.01, help='Learning rate')
+    parser.add_argument('--learning_rate', type=float, default=0.1, help='Learning rate')
     parser.add_argument('--hidden_layers', type=int, nargs='+', default=[32, 16],
                         help='Number of neurons in hidden layers')
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
@@ -222,7 +227,7 @@ def main():
     if args.mode == 'train':
         X_train, X_valid, y_train, y_valid = split_dataset(X, y, validation_split=0.2, seed=args.seed)
 
-        X_train, X_valid = normalize_data(X_train, X_valid)
+        X_train, X_valid, normalization_params = normalize_data(X_train, X_valid)
 
         num_classes = len(np.unique(y))
         y_train_encoded = one_hot_encode(y_train, num_classes)
@@ -237,64 +242,38 @@ def main():
         )
 
         mlp.train(X_train, y_train_encoded, X_valid, y_valid_encoded, epochs=args.epochs)
+        mlp.save_model(args.model, normalization_params)
 
-        # # Save model
-        # mlp.save_model(args.model)
+    elif args.mode == 'predict':
+        mlp = MLP(input_size=X.shape[1])
+        normalization_params = mlp.load_model(args.model)
 
+        # Use saved normalization parameters from training
+        if normalization_params is not None:
+            mean = normalization_params['mean']
+            std = normalization_params['std']
+            X_normalized = (X - mean) / std
+        else:
+            # Fallback to computing normalization from current data
+            X_mean = np.mean(X, axis=0)
+            X_std = np.std(X, axis=0)
+            X_std[X_std == 0] = 1
+            X_normalized = (X - X_mean) / X_std
 
+        predictions, probabilities = mlp.predict(X_normalized)
 
-    # if args.mode == 'train':
-    #     # Split dataset
-    #     X_train, X_valid, y_train, y_valid = split_dataset(X, y, validation_split=0.2, seed=args.seed)
+        num_classes = len(np.unique(y))
+        y_encoded = one_hot_encode(y, num_classes)
 
-    #     # Normalize data
-    #     X_train, X_valid = normalize_data(X_train, X_valid)
+        loss = mlp.binary_cross_entropy(y_encoded, probabilities)
 
-    #     # One-hot encode labels
-    #     num_classes = len(np.unique(y))
-    #     y_train_encoded = one_hot_encode(y_train, num_classes)
-    #     y_valid_encoded = one_hot_encode(y_valid, num_classes)
-
-    #     # Create and train model
-    #     mlp = MLP(
-    #         input_size=X_train.shape[1],
-    #         hidden_layers=args.hidden_layers,
-    #         output_size=num_classes,
-    #         learning_rate=args.learning_rate,
-    #         seed=args.seed
-    #     )
-
-    #     mlp.train(X_train, y_train_encoded, X_valid, y_valid_encoded, epochs=args.epochs)
-
-    #     # Save model
-    #     mlp.save_model(args.model)
-
-    # elif args.mode == 'predict':
-    #     # Load model
-    #     mlp = MLP(input_size=X.shape[1])  # Dummy initialization
-    #     mlp.load_model(args.model)
-
-    #     # Normalize data (in practice, save normalization params during training)
-    #     X_mean = np.mean(X, axis=0)
-    #     X_std = np.std(X, axis=0)
-    #     X_std[X_std == 0] = 1
-    #     X_normalized = (X - X_mean) / X_std
-
-    #     # Make predictions
-    #     predictions, probabilities = mlp.predict(X_normalized)
-
-    #     # One-hot encode true labels for loss calculation
-    #     num_classes = len(np.unique(y))
-    #     y_encoded = one_hot_encode(y, num_classes)
-
-    #     # Calculate loss
-    #     loss = mlp.binary_cross_entropy(y_encoded, probabilities)
-
-    #     print(f"\nPrediction Results:")
-    #     print(f"Loss: {loss:.4f}")
-    #     print(f"Accuracy: {np.mean(predictions == y):.4f}")
-    #     print(f"\nFirst 10 predictions: {predictions[:10]}")
-    #     print(f"First 10 true labels: {y[:10]}")
+        print(f"\nPrediction Results:")
+        print(f"Loss: {loss:.4f}")
+        print(f"Accuracy: {np.mean(predictions == y):.4f}")
+        print(f"\nFirst 10 predictions: {predictions[:10]}")
+        print(f"First 10 true labels: {y[:10]}")
+        print(f"Last 10 predictions: {predictions[-10:]}")
+        print(f"Last 10 true labels: {y[-10:]}")
 
 
 if __name__ == "__main__":
