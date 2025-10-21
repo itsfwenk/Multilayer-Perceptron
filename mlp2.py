@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import argparse
-
+import matplotlib.pyplot as plt
 
 class MLP:
     def __init__(self, input_size, hidden_layers=[32, 16], output_size=1, learning_rate=0.01, seed=42):
@@ -12,7 +12,6 @@ class MLP:
         self.biases = []
 
         for i in range(len(self.layers) - 1):
-            # Xavier/Glorot initialization for better gradient flow
             weight_matrix = np.random.randn(self.layers[i], self.layers[i + 1]) * np.sqrt(2.0 / (self.layers[i] + self.layers[i + 1]))
             bias_vector = np.zeros((1, self.layers[i + 1]))
             self.weights.append(weight_matrix)
@@ -111,13 +110,56 @@ class MLP:
             epochs: Number of training epochs
         """
 
+        t_loss = np.zeros(epochs)
+        v_loss = np.zeros(epochs)
+        t_accuracy = np.zeros(epochs)
+        v_accuracy = np.zeros(epochs)
+        epochs_list = np.arange(epochs)
+
+        y_train_labels = np.argmax(y_train, axis=1)
+        y_valid_labels = np.argmax(y_valid, axis=1)
+
         for epoch in range(epochs):
             activations = self.forward(X_train)
             self.backward(X_train, y_train, activations)
             train_loss = self.binary_cross_entropy(y_train, activations[-1])
             valid_activations = self.forward(X_valid)
             valid_loss = self.binary_cross_entropy(y_valid, valid_activations[-1])
-            print(f"epoch {epoch+1:02d}/{epochs} - loss: {train_loss:.4f} - val_loss: {valid_loss:.4f}")
+
+            train_pred = np.argmax(activations[-1], axis=1)
+            valid_pred = np.argmax(valid_activations[-1], axis=1)
+            train_acc = np.mean(train_pred == y_train_labels)
+            valid_acc = np.mean(valid_pred == y_valid_labels)
+
+            print(f"epoch {epoch+1:02d}/{epochs} - loss: {train_loss:.4f} - val_loss: {valid_loss:.4f} - acc: {train_acc:.4f} - val_acc: {valid_acc:.4f}")
+
+            t_loss[epoch] = train_loss
+            v_loss[epoch] = valid_loss
+            t_accuracy[epoch] = train_acc
+            v_accuracy[epoch] = valid_acc
+
+        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+        axes[0].plot(epochs_list, t_loss, label='Training Loss')
+        axes[0].plot(epochs_list, v_loss, label='Validation Loss')
+        axes[0].set_xlabel('Epochs')
+        axes[0].set_ylabel('Loss')
+        axes[0].set_title('Training and Validation Loss over Epochs')
+        axes[0].legend()
+        axes[0].grid(True, alpha=0.3)
+
+        axes[1].plot(epochs_list, t_accuracy, label='Training Accuracy')
+        axes[1].plot(epochs_list, v_accuracy, label='Validation Accuracy')
+        axes[1].set_xlabel('Epochs')
+        axes[1].set_ylabel('Accuracy')
+        axes[1].set_title('Training and Validation Accuracy over Epochs')
+        axes[1].legend()
+        axes[1].grid(True, alpha=0.3)
+
+        plt.tight_layout()
+        plt.show()
+
+        return t_loss, v_loss
 
     def predict(self, X):
         """
@@ -219,9 +261,7 @@ def main():
 
     args = parser.parse_args()
 
-    # Load dataset
     X, y = load_dataset(args.dataset)
-    # print(X.shape, y.shape)
 
 
     if args.mode == 'train':
@@ -248,13 +288,11 @@ def main():
         mlp = MLP(input_size=X.shape[1])
         normalization_params = mlp.load_model(args.model)
 
-        # Use saved normalization parameters from training
         if normalization_params is not None:
             mean = normalization_params['mean']
             std = normalization_params['std']
             X_normalized = (X - mean) / std
         else:
-            # Fallback to computing normalization from current data
             X_mean = np.mean(X, axis=0)
             X_std = np.std(X, axis=0)
             X_std[X_std == 0] = 1
