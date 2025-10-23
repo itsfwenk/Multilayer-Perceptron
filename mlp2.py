@@ -110,6 +110,8 @@ class MLP:
             epochs: Number of training epochs
         """
 
+        print(f"x_train shape : {X_train.shape}")
+        print(f"x_valid shape : {X_valid.shape}")
         t_loss = np.zeros(epochs)
         v_loss = np.zeros(epochs)
         t_accuracy = np.zeros(epochs)
