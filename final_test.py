@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from mlp2 import MLP, load_dataset
+from mlp import MLP, load_dataset
 
 # Load data
 X, y = load_dataset('data.csv')
