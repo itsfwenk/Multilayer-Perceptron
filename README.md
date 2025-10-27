@@ -45,10 +45,10 @@ pip install numpy pandas matplotlib
 
 ```bash
 # Basic training with default parameters
-python mlp2.py --mode train
+python mlp.py --mode train
 
 # Custom training with specific parameters
-python mlp2.py --mode train \
+python mlp.py --mode train \
     --epochs 100 \
     --learning_rate 0.1 \
     --hidden_layers 64 32 16 \
@@ -59,7 +59,7 @@ python mlp2.py --mode train \
 
 ```bash
 # Predict using saved model
-python mlp2.py --mode predict --model ./saved_model.npy
+python mlp.py --mode predict --model ./saved_model.npy
 ```
 
 ### Command Line Arguments
@@ -154,7 +154,7 @@ weight_matrix = np.random.randn(input_size, output_size) * np.sqrt(2.0 / (input_
 ## 📁 Project Structure
 
 ```
-├── mlp2.py              # Main implementation
+├── mlp.py              # Main implementation
 ├── data.csv             # Breast cancer dataset
 ├── saved_model.npy      # Trained model (created after training)
 ├── .gitignore          # Git ignore file
